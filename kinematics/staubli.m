@@ -1,92 +1,92 @@
-%% ********** ΒΙΟΜΗΧΑΝΙΚΟΣ ΡΟΜΠΟΤΙΚΟΣ ΧΕΙΡΙΣΤΗΣ **********************%%%
+%% ********** kinematic simulation of 3-dof staubli robot *************%%%
 clear all; 
 close all; 
 
-%%%%%%%%%%%%%%%%%%%%%%%% ΜΗΚΗ ΤΩΝ ΣΥΝΔΕΣΜΩΝ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-l(1) = 420;         % σε mm 
-l(2) = 450;         % σε mm
-l(3) = 650+85+100;  % l3+l4+le σε mm
+%%%%%%%%%%%%%%%%%%%%%%%% lengths of links % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+l(1) = 420;         % in mm 
+l(2) = 450;         % in mm
+l(3) = 650+85+100;  % l3+l4+le in mm
 
-%%%%%%%%%%%%%%%%%%%% ΠΕΡΙΟΔΟΣ ΔΕΙΓΜΑΤΟΛΗΨΙΑΣ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-dt = 0.001;         %τυπικα 1 msec 
-
-
-
-%% ************ ΣΧΕΔΙΑΣΜΟΣ ΕΠΙΘΥΜΗΤΗΣ ΤΡΟΧΙΑΣ ****************************
+%%%%%%%%%%%%%%%%%%%%%%%%% sampling frequency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+dt = 0.001;         % typical 1 msec 
 
 
-%%%%%%%%%%%%%%%%%%%% ΒΑΣΙΚΟΙ ΕΠΙΘΥΜΗΤΟΙ ΧΡΟΝΟΙ %%%%%%%%%%%%%%%%%%%%%%%%%%%
-%χρονος προσεγγισης της ευθειας σε sec
+
+%% ******************** Motion Planning **********************************
+
+
+%%%%%%%%%%%%%%%%%%%% desired time at each section %%%%%%%%%%%%%%%%%%%%%%%%
+% time to reach the starting point in sec
 T1 = 2; 
 
-%χρονος διαγραφης της ευθειας σε sec
+% time to complete the straight line motion in sec
 T2 = 5; 
 
-%χρονος επιβραδυνσης σε sec
+% time to stop to a desired end point sec
 T3 = 2;      
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%% ΒΑΣΙΚΕΣ ΘΕΣΕΙΣ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%αρχικη θεση του τελικου στοιχειου δρασης
+%%%%%%%%%%%%%%%%%%%%%%% desired positions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% initial position of the endpoint
 px0 = 600;  py0 = 750;    pz0 = 1000;
 
-%αρχικο σημειο της επιθυμητης ευθειας
+% position of the starting line point
 px1 = 725;  py1 = 825;  pz1 = 900;
 
-%τελικο σημειο της επιθυμητης ευθειας
+% position of the ending line point
 px2 = 1000; py2 =-450;  pz2 = 150;
 
-%τελικο σημειο του τελικου στοιχειου δρασης
+% position of the point to stop the movement
 px3 = 950;  py3 = -560;    pz3 = 100;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%% ΒΑΣΙΚΕΣ ΤΑΧΥΤΗΤΕΣ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%αρχικη ταχυτητα του τελικου στοιχειου δρασης
+%%%%%%%%%%%%%%%%%%%%%%%% desired velocities %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% initial velocities
 vx0 = 0;    vy0 = 0;    vz0 = 0;
 
-%ταχυτητα με την οποια πρεπει να προσεγγισει την ευθεια
+% computation of desired velocities when entering the line
 vx1 = (px2-px1)/T2;  vy1 = (py2-py1)/T2;  vz1 = (pz2-pz1)/T2;
 
-%ταχυτητα με την οποια βγαινει απο την ευθεια
+% velocities when exiting the line
 vx2 = vx1;  vy2 = vy1;  vz2 = vz1;
 
-%ταχυτητα με την οποια τελειωνει η εργασια
+% final velocities (stop)
 vx3 = 0;    vy3 = 0;    vz3 = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%% ΒΑΣΙΚΕΣ ΕΠΙΤΑΧΥΝΣΕΙΣ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%αρχικη επιταχυνση του τελικου στοιχειου δρασης
+%%%%%%%%%%%%%%%%%%%%%%% desired accelerations %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% initial desired acceleration
 gx0 = 0;    gy0 = 0;    gz0 = 0;
 
-%ταχυτητα με την οποια πρεπει να προσεγγισει την ευθεια
+% acceleration when entering the straight line
 gx1 = 0;    gy1 = 0;    gz1 = 0;
 
-%ταχυτητα με την οποια βγαινει απο την ευθεια
+% acceleration when exiting the straight line
 gx2 = 0;    gy2 = 0;    gz2 = 0;
 
-%ταχυτητα με την οποια τελειωνει η εργασια
+% acceleration at the end point
 gx3 = 0;    gy3 = 0;    gz3 = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
-%%%%%%%%%%%% ΠΟΛΥΩΝΥΜΙΚΗ ΠΑΡΕΜΒΟΛΗ ΚΑΤΑ ΤΗΝ ΠΡΟΣΕΓΓΙΣΗ %%%%%%%%%%%%%%%%%%%%
-%διανυσμα χρονικων στιγμων κατα την προσεγγιση
+%%%%%%%%%%%%%%%%%%%%% POLYNOMIAL INTERPOLATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% vector of timesteps
 t1 = 0:dt:T1; 
 
-%οριζουμε το συστημα A*S=B για καθε διασταση με τετοιo τροπο ωστε στον S 
-%θα εχουμε τους συντελεστες του πολυονυμου 5ου βαθμου για προσεγγιση με 
-%συνεχη επιταχυνση. Θα μπορουσαμε να χρησιμοποιησουμε απ'ευθειας τους
-%τυπους αλλα αφηνουμε το matlab να λυσει το συστημα.
+% By constructing the linear system A*S=B for every dimention in a way such
+% that S will contain the coefficients fo the 5th degree polynomial for
+% having a continous (as a function in time) acceleration, meaning we can
+% control jerk. 
 A1 = [1       0       0       0       0       0;
       0       1       0       0       0       0;
       0       0       1       0       0       0;
@@ -102,17 +102,17 @@ S1x=linsolve(A1,B1x);
 S1y=linsolve(A1,B1y);
 S1z=linsolve(A1,B1z);
 
-%τωρα στους S1 βρισκονται οι συντελεστες του πολυονυμου 5ου βαθμου
+% S1 now contains the coefficients of the 5th degree polynomial
 a0x=S1x(1); a1x=S1x(2); a2x=S1x(3); a3x=S1x(4); a4x=S1x(5); a5x=S1x(6);
 a0y=S1y(1); a1y=S1y(2); a2y=S1y(3); a3y=S1y(4); a4y=S1y(5); a5y=S1y(6);
 a0z=S1z(1); a1z=S1z(2); a2z=S1z(3); a3z=S1z(4); a4z=S1z(5); a5z=S1z(6);
 
-% υπολογισμος του διανυσματος των επιθυμητων θεσεων κατα την προσεγγιση
+% computation of the desired positions when approaching the straight line
 pdx1 = a0x+a1x*t1+a2x*t1.^2+a3x*t1.^3+a4x*t1.^4+a5x*t1.^5;
 pdy1 = a0y+a1y*t1+a2y*t1.^2+a3y*t1.^3+a4y*t1.^4+a5y*t1.^5;
 pdz1 = a0z+a1z*t1+a2z*t1.^2+a3z*t1.^3+a4z*t1.^4+a5z*t1.^5;
 
-%υπολογισμος του διανυσματος των επιθυμητων ταχυτητων κατα την προσεγγιση
+% computation of the desired velocities when approaching the straight line
 vdx1 = a1x+2*a2x*t1+3*a3x*t1.^2+4*a4x*t1.^3+5*a5x*t1.^4;
 vdy1 = a1y+2*a2y*t1+3*a3y*t1.^2+4*a4y*t1.^3+5*a5y*t1.^4;
 vdz1 = a1z+2*a2z*t1+3*a3z*t1.^2+4*a4z*t1.^3+5*a5z*t1.^4;
@@ -122,16 +122,16 @@ vdz1 = a1z+2*a2z*t1+3*a3z*t1.^2+4*a4z*t1.^3+5*a5z*t1.^4;
 
 
 
-%%%%%%%%%%%%%% ΣΧΕΔΙΑΣΜΟΣ ΤΡΟΧΙΑΣ ΚΑΤΑ ΤΗ ΣΥΓΚΟΛΗΣΗ %%%%%%%%%%%%%%%%%%%%%%%
-%διανυσμα χρονικων στιγμων κατα την συγκοληση
-t2=dt:dt:T2;  % *αρχιζω απο dt για να μην εχω απικαλυψη αργοτερα
+%%%%%%%%%%%%%%% 	MOTION PLANNING DURING WELDING  %%%%%%%%%%%%%%%%%%%%%%%
+% vector of timesteps during welding
+t2=dt:dt:T2;  % notice we start from dt here
 
-% υπολογισμος του διανυσματος των επιθυμητων θεσεων κατα τη συγκοληση
+% vector of desired positions during welding
 pdx2 = px1+vx1*t2;
 pdy2 = py1+vy1*t2;
 pdz2 = pz1+vz1*t2;
 
-%υπολογισμος του διανυσματος των επιθυμητων ταχυτητων κατα τη συγκοληση
+% vector of desired velocities during welding
 vdx2(1:length(t2)) = vx1;
 vdy2(1:length(t2)) = vy1;
 vdz2(1:length(t2)) = vz1;
@@ -140,11 +140,11 @@ vdz2(1:length(t2)) = vz1;
 
 
 
-%%%%%%%%%%%%%% ΠΟΛΥΩΝΥΜΙΚΗ ΠΑΡΕΜΒΟΛΗ ΚΑΤΑ ΤΗΝ ΑΠΟΜΑΚΡΥΝΣΗ %%%%%%%%%%%%%%%%%
-%διανυσμα χρονικων στιγμων κατα την απομακρυνση
+%%%%%%%%%%%%%% POLYNOMIAL INTERPOLATION DURING EXIT %%%%%%%%%%%%%%%%%%%%%%
+% vector of timesteps
 t3=dt:dt:T3;
 
-%και παλι οριζουμε το συστημα A*S=B για καθε διασταση
+% Again we construct a linear system to solve for every dimension
 A2 = [1       0       0       0       0       0;
       0       1       0       0       0       0;
       0       0       1       0       0       0;
@@ -160,17 +160,17 @@ S2x=linsolve(A2,B2x);
 S2y=linsolve(A2,B2y);
 S2z=linsolve(A2,B2z);
 
-%τωρα στους S2 βρισκονται οι συντελεστες του πολυονυμου 5ου βαθμου
+% S2 now has the coefficients of the 5th degree polynomial
 b0x=S2x(1); b1x=S2x(2); b2x=S2x(3); b3x=S2x(4); b4x=S2x(5); b5x=S2x(6);
 b0y=S2y(1); b1y=S2y(2); b2y=S2y(3); b3y=S2y(4); b4y=S2y(5); b5y=S2y(6);
 b0z=S2z(1); b1z=S2z(2); b2z=S2z(3); b3z=S2z(4); b4z=S2z(5); b5z=S2z(6);
 
-% υπολογισμος του διανυσματος των επιθυμητων θεσεων κατα την απομακρυνση
+% computation of the desired positions when exiting
 pdx3 = b0x+b1x*t3+b2x*t3.^2+b3x*t3.^3+b4x*t3.^4+b5x*t3.^5;
 pdy3 = b0y+b1y*t3+b2y*t3.^2+b3y*t3.^3+b4y*t3.^4+b5y*t3.^5;
 pdz3 = b0z+b1z*t3+b2z*t3.^2+b3z*t3.^3+b4z*t3.^4+b5z*t3.^5;
 
-%υπολογισμος του διανυσματος των επιθυμητων ταχυτητων κατα την απομακρυνση
+% computation of the desired velocities when exiting
 vdx3 = b1x+2*b2x*t3+3*b3x*t3.^2+4*b4x*t3.^3+5*b5x*t3.^4;
 vdy3 = b1y+2*b2y*t3+3*b3y*t3.^2+4*b4y*t3.^3+5*b5y*t3.^4;
 vdz3 = b1z+2*b2z*t3+3*b3z*t3.^2+4*b4z*t3.^3+5*b5z*t3.^4;
@@ -180,14 +180,14 @@ vdz3 = b1z+2*b2z*t3+3*b3z*t3.^2+4*b4z*t3.^3+5*b5z*t3.^4;
 
 
 
-%%%%%%%%%%% CONCATENATION ΤΩΝ ΕΠΙΘΥΜΗΤΩΝ ΘΕΣΕΩΝ ΚΑΙ ΤΑΧΥΤΗΤΩΝ %%%%%%%%%%%%%
+%%%%%%%%% CONCATENATION OF THE DESIRED POSITIONS AND VELOCITIES %%%%%%%%%%%
 
-% διανυσμα επιθυμητων θεσεων σε καθε χρονικη στιγμη
+% vectors of the desired position at every timestep
 pdx = [pdx1 pdx2 pdx3];
 pdy = [pdy1 pdy2 pdy3];
 pdz = [pdz1 pdz2 pdz3];
 
-%διανυσμα επιθυμητων ταχυτητων σε καθε χρονικη στιγμη
+% vectors of the desired velocities at every timestep
 vdx = [vdx1 vdx2 vdx3];
 vdy = [vdy1 vdy2 vdy3];
 vdz = [vdz1 vdz2 vdz3];
@@ -199,30 +199,30 @@ vdz = [vdz1 vdz2 vdz3];
 
 
 
-%% ***** ΔΗΜΙΟΥΡΓΙΑ USER INTERFACE ΓΙΑ ΕΠΙΛΟΓΗ ΕΠΙΘΥΜΗΤΗΣ ΛΥΣΗΣ ***********
+%% *********  USER INTERFACE FOR CHOICE OF DESIRED SOLUTION ***************
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 first=0;  second=0;  third=0;  fourth=0;
 
-scrsz = get(0,'ScreenSize');
-figure('Position',[(scrsz(3)/2)-150 (scrsz(4)/2)-400 300 800]); 
+%scrsz = get(0,'ScreenSize');
+%figure('Position',[(scrsz(3)/2)-150 (scrsz(4)/2)-400 300 800]); 
 
 h1 = uicontrol('Style', 'pushbutton', 'String', 'front-elbow up',...
-   'Position', [10 650 100 100],...
+   'Position', [10 310 120 70],...
    'Callback', 'first=1;');
 h2 = uicontrol('Style', 'pushbutton', 'String', 'front-elbow down',...
-   'Position', [10 450 100 100],...
+   'Position', [10 210 120 70],...
    'Callback', 'second=1;');
 h3 = uicontrol('Style', 'pushbutton', 'String', 'back-elbow down',...
-   'Position', [10 250 100 100],...
+   'Position', [10 110 120 70],...
    'Callback', 'third=1;');
 h4 = uicontrol('Style', 'pushbutton', 'String', 'back-elbow up',...
-   'Position', [10 50 100 100],...
+   'Position', [10 10 120 70],...
    'Callback', 'fourth=1;');
 
 
-p1=subplot('position',[0.45 0.80 0.5 0.15]);
-hold on
+p1=subplot('position',[0.45 0.65 0.5 0.15]);
+hold on; box on;
 title('\fontsize{18} {\color{blue}Choose Solution                   }');
 plot([10 10],[10 50],'linewidth',2);  plot(10,50,'o','linewidth',2);
 plot([10 50],[50 80],'linewidth',2);  plot(50,80,'o','linewidth',2);
@@ -230,16 +230,16 @@ plot([50 90],[80 50],'linewidth',2);  plot(90,50,'r*','linewidth',2);
 plot([0 10],[10 20],'linewidth',2);   plot([0 10],[10 10],'linewidth',2);
 axis([-15 100 0 100]);
 
-p2=subplot('position',[0.45 0.55 0.5 0.15]);
-hold on
+p2=subplot('position',[0.45 0.45 0.5 0.15]);
+hold on; box on;
 plot([10 10],[10 50],'linewidth',2);  plot(10,50,'o','linewidth',2);
 plot([10 50],[50 20],'linewidth',2);  plot(50,20,'o','linewidth',2);
 plot([50 90],[20 50],'linewidth',2);  plot(90,50,'r*','linewidth',2);
 plot([0 10],[10 20],'linewidth',2);   plot([0 10],[10 10],'linewidth',2);
 axis([-15 100 0 100]);
 
-p3=subplot('position',[0.45 0.3 0.5 0.15]);
-hold on
+p3=subplot('position',[0.45 0.25 0.5 0.15]);
+hold on; box on;
 plot([10 10],[10 50],'linewidth',2);  plot(10,50,'o','linewidth',2);
 plot([10 50],[50 20],'linewidth',2);  plot(50,20,'o','linewidth',2);
 plot([50 90],[20 50],'linewidth',2);  plot(90,50,'r*','linewidth',2);
@@ -247,7 +247,7 @@ plot([20 10],[10 20],'linewidth',2);   plot([10 20],[10 10],'linewidth',2);
 axis([-15 100 0 100]);
 
 p4=subplot('position',[0.45 0.05 0.5 0.15]);
-hold on
+hold on; box on;
 plot([10 10],[10 50],'linewidth',2);  plot(10,50,'o','linewidth',2);
 plot([10 50],[50 80],'linewidth',2);  plot(50,80,'o','linewidth',2);
 plot([50 90],[80 50],'linewidth',2);  plot(90,50,'r*','linewidth',2);
@@ -263,14 +263,11 @@ close;
 
 
 
-%% ***************  ΑΝΤΙΣΤΡΟΦΟ ΚΙΝΗΜΑΤΙΚΟ ΜΟΝΤΕΛΟ *************************
-%Υπολογιζουμε και αποθηκευουμε τις επιθυμητες γωνιακες θεσεις των αρθρωσεων
-%στα arrays qd1 , qd2 , qd3. Μπορειτε με comment και uncomment να 
-%ενεργοποιειτε την επιθυμητη λυση απο τις τεσσερις που περιγραφηκαν στο
-%θεωρητικο μερος.
+%% *****************  REVERSE KINEMATIC MODEL ****************************
+% computation of desired angles for the joints
 
 
-%σχεσεις που θα μας χρειαστουν
+% useful variables
 rxy = (pdx.^2+pdy.^2).^(1/2);
 dxy = (pdx.^2+pdy.^2);
 
@@ -332,19 +329,19 @@ end
 
 
    
-%% ****************** ΕΥΘΥ ΚΙΝΗΜΑΤΙΚΟ ΜΟΝΤΕΛΟ ***************************** 
+%% ********************* KINEMATIC MODEL ********************************** 
 
-%Θεση του ακρου του 1ου συνδεσμου
+% position of the first joint
 px1d(1:length(c1)) = 0;
 py1d(1:length(c1)) = 0;
 pz1d(1:length(c1)) = l(1);
 
-%Θεση του ακρου του 2ου συνδεσμου
+% position of the second joint
 px2d = c1.*(l(2)*s2);
 py2d = s1.*(l(2)*s2);
 pz2d = l(1) + l(2)*c2;
 
-%Θεση του τελικου στοιχειου δρασης - εργαλειου
+% position of end effector
 px3d = c1.*(l(2)*s2+l(3)*s23); 
 py3d = s1.*(l(2)*s2+l(3)*s23);
 pz3d = l(1) + l(2)*c2 + l(3)*c23;
@@ -352,32 +349,31 @@ pz3d = l(1) + l(2)*c2 + l(3)*c23;
 
 
 
-%% **************** ΑΝΤΙΣΤΡΟΦΟ ΔΙΑΦΟΡΙΚΟ ΜΟΝΤΕΛΟ **************************
-%Υπολογιζουμε και αποθηκευουμε το χρονικο διανυσμα των επιθυμητων γωνιακων
-%ταχυτητων γιακαθε χρονικη στιγμη στα arrays qd_1 , qd_2, qd_3
+%% ******************** REVERSE DYNAMIC MODEL *****************************
+% computation of the desirer angular velocities of the joints
 
 
 %%%%%%%%%%%%%%%% JACOBIAN AND ANGULAR VELOCITIES %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%μηκος του συνολικου χρονικου διανυσματος
+% length of the total vector time length
 kmax = length(t1)+length(t2)+length(t3);
 
-%αρχικοποιησεις για καλυτερη αποδοση
+% initializations of variables
 qd_1 = zeros([1 kmax]);
 qd_2 = zeros([1 kmax]);
 qd_3 = zeros([1 kmax]);
 
 for i=1:1:kmax 
     
-    %Υπολογισμος Ιακωβιανης καθε χρονικη στιγμη
+    % computation of Jacobian at every timestep
     Jac=[-s1(i).*(l(2)*s2(i)+l(3)*s23(i))   c1(i).*(l(2)*c2(i)+l(3)*c23(i))    l(3)*c1(i).*c23(i);
           c1(i).*(l(2)*s2(i)+l(3)*s23(i))   s1(i).*(l(2)*c2(i)+l(3)*c23(i))    l(3)*s1(i).*c23(i);
            0                                -(l(2)*s2(i)+l(3)*s23(i))               -l(3)*s23(i)];
        
-    %Υπολογισμος αντιστροφης Ιακωβιανης καθε χρονικη στιγμη 
+    % computation of the inverse Jacobian at every timestep
     Jacinv=inv(Jac);
     
-    %Υπολογισμος γωνιακων ταχυτητων καθε χρονικη στιγμη
+    % computation of the desired angular velocities at every timestep
     qd_1(i) = Jacinv(1,:)*[vdx(i) vdy(i) vdz(i)]';
     qd_2(i) = Jacinv(2,:)*[vdx(i) vdy(i) vdz(i)]';
     qd_3(i) = Jacinv(3,:)*[vdx(i) vdy(i) vdz(i)]';
@@ -388,15 +384,14 @@ end
 
 
 
-%% ****************** ΚΙΝΗΜΑΤΙΚΗ ΠΡΟΣΩΜΟΙΩΣΗ ****************************** 
+%% ******************* KINEMATIC SIMULATION ****************************** 
 disp('Kinematic Simulation ...'); %% 
 disp(' '); %% 
 
 
 %% ***********************************************************************
 
-%%%%%%%%%% ΔΙΑΓΡΑΜΜΑΤΑ ΤΗΣ ΚΙΝΗΣΗΣ - ΑΠΕΙΚΟΝΙΣΗ ΤΗΣ ΠΡΟΣΟΜΟΙΩΣΗΣ %%%%%%%%%%
-%επιλογη της θεσης εμφανισης και των χαρακτηριστικων του γραφηματος
+%%%%%%%%%% DIAGRAMS OF MOTION - SIMULATION VISUALIZATION %%%%%%%%%%%%%%%%%
 scrsz = get(0,'ScreenSize');
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 hold on 
@@ -413,16 +408,16 @@ zlabel('z (mm)');
 title('\fontsize{18} {\color{blue}3D Kinematic Simulation}');
 plot3(0,0,0,'rs','LineWidth',3); 
 
-%εμφανιση της καμπυλης προσεγγισης
+% desired approach line
 plot3(pdx1,pdy1,pdz1,'r');
 
-%εμφανιση της ευθειας με εντονο μαυρο χρωμα
+% desired straight line while welding
 plot3([px1,px2],[py1,py2],[pz1,pz2],'k','LineWidth',6);
 
-%εμφανιση της καμπυλης απομακρυνσης
+% desired exiting line
 plot3(pdx3,pdy3,pdz3,'r');
 
-%θα φτιαξω μια βαση για να φαινεται η περιστροφη της 1ης αρθρωσης
+% for visualizing the base of the robot
 pbx1=-50*c1;   pby1=-50*s1;    pbz1=0*c1;
 pbx2=0*c1;     pby2=0*s1;      pbz2=pbz1+100;
 
@@ -465,8 +460,7 @@ pause(1.0);
 
 %%%%%%%%%%%%%%%%%%%%%%%% STICK DIAGRAM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%  ΔΙΑΓΡΑΜΜΑΤΑ ΣΤΙΣ ΤΡΕΙΣ ΔΙΑΣΤΑΣΕΙΣ %%%%%%%%%%%%%%%%%%%%%%
-%επιλογη της θεσης εμφανισης και των χαρακτηριστικων του γραφηματος
+%%%%%%%%%%%%%%%%%%%  DIAGRAMS IN 3 DIMENSIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 scrsz = get(0,'ScreenSize');
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 hold on 
@@ -480,21 +474,21 @@ zlabel('z (mm)');
 title('\fontsize{18} {\color{blue}3D Kinematic Simulation}');
 plot3(0,0,0,'rs','LineWidth',3); 
 
-%εμφανιση της καμπυλης προσεγγισης
+% plot of desired approach line
 plot3(pdx1,pdy1,pdz1,'r');
 
-%εμφανιση της ευθειας με εντονο μαυρο χρωμα
+% plot of desired straight line of welding with strong black color
 plot3([px1,px2],[py1,py2],[pz1,pz2],'k','LineWidth',6);
 
-%εμφανιση της καμπυλης απομακρυνσης
+% plot of exiting line
 plot3(pdx3,pdy3,pdz3,'r');
 
-%εφανιση της θεσης καθε dtk δειγματα
+% plot position every dtk samples
 dtk=100; 
 
 for tk=1:dtk:kmax,   	
     
-   pause(0.05);	%παυση για σταδιακη απεικονιση των διαγραμματων    
+   pause(0.05);	% drawnow can also be used;
    
    plot3([0,px1d(tk)],[0,py1d(tk)],[0,pz1d(tk)],'LineWidth',1);					
    plot3(px1d(tk),py1d(tk),pz1d(tk),'ro','LineWidth',3);    
@@ -512,9 +506,8 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%  ΔΙΑΓΡΑΜΜΑΤΑ ΣΤΟ Χ-Υ ΕΠΙΠΕΔΟ %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%  DIAGRAMS IN X-Y PLANE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%επιλογη της θεσης εμφανισης και των χαρακτηριστικων του γραφηματος
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 hold on 
 grid on
@@ -549,9 +542,8 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%  ΔΙΑΓΡΑΜΜΑΤΑ ΣΤΟ Y-Z ΕΠΙΠΕΔΟ %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%  DIAGRAMS IN Y-Z PLANE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%επιλογη της θεσης εμφανισης και των χαρακτηριστικων του γραφηματος
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 hold on 
 grid on
@@ -586,14 +578,13 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%  ΔΙΑΓΡΑΜΜΑΤΑ ΣΤΟ Χ-Ζ ΕΠΙΠΕΔΟ %%%%%%%%%%%%%%%%%%%%%%%%%%
-%επιλογη της θεσης εμφανισης και των χαρακτηριστικων του γραφηματος
+%%%%%%%%%%%%%%%%%%%  DIAGRAMS IN X-Z PLANE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 hold on 
 grid on
 axis square
 xlabel('x (mm)'); 
-ylabel('Ζ (mm)');  
+ylabel('z (mm)');  
 title('\fontsize{18} {\color{blue}X-Z Kinematic Simulation}');
 plot(0,0,'rs','LineWidth',3); 
 
@@ -620,38 +611,38 @@ end
 
 
 
-%%%%%%%%%%%%% ΔΙΑΓΡΑΜΜΑΤΑ ΓΩΝΙΑΚΩΝ ΘΕΣΕΩΝ ΚΑΙ ΤΑΧΥΤΗΤΩΝ %%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% DIAGRAMS OF ANGULAR POSITIONS AND VELOCITIES %%%%%%%%%%%%%%%%
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 t=linspace(0,T1+T2+T3,kmax);
 
 subplot(3,2,1);
 plot(t,qd1);
-title('\fontsize{14}γωνια στροφης της 1ης αρθρωσης (rad)');
+title('angle of 1st joint (rad)');
 xlabel('time (sec)');
 
 subplot(3,2,2);
 plot(t,qd_1);
-title('\fontsize{14}γωνιακη ταχυτητα της 1ης αρθρωσης(rad/sec)');
+title('angular velocity of 1st joint (rad/sec)');
 xlabel('time (sec)');
 
 subplot(3,2,3);
 plot(t,qd2);
-title('\fontsize{14}γωνια στροφης της 2ης αρθρωσης(rad)');
+title('angle of 2nd joint (rad)');
 xlabel('time (sec)');
 
 subplot(3,2,4);
 plot(t,qd_2);
-title('\fontsize{14}γωνιακη ταχυτητα της 2ης αρθρωσης(rad/sec)');
+title('angular velocity of 2nd joint (rad/sec)');
 xlabel('time (sec)');
 
 subplot(3,2,5);
 plot(t,qd3);
-title('\fontsize{14}γωνια στροφης της 3ης αρθρωσης(rad)');
+title('angle of 3rd joint (rad)');
 xlabel('time (sec)');
 
 subplot(3,2,6);
 plot(t,qd_3);
-title('\fontsize{14}γωνιακη ταχυτητα της 3ης αρθρωσης(rad/sec)');
+title('angular velocity of 3rd joint (rad/sec)');
 xlabel('time (sec)');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -659,43 +650,40 @@ xlabel('time (sec)');
 pause(1.0);
 
 
-%%%%%%%%%%%% ΔΙΑΓΡΑΜΜΑΤΑ ΚΑΡΤΕΣΙΑΝΩΝ ΘΕΣΕΩΝ ΚΑΙ ΤΑΧΥΤΗΤΩΝ %%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% DIAGRAMS OF CARTESIAN POSITIONS AND VELOCITIES %%%%%%%%%%%%%%%
 figure('Position',[100 100 scrsz(3)-200 scrsz(4)-200]); 
 
 subplot(3,2,1);
 plot(t,pdx);
-title('\fontsize{14}επιθυμητη θεση στον x - αξονα (mm)');
+title('desired x position (mm)');
 xlabel('time (sec)');
 
 subplot(3,2,2);
 plot(t,vdx);
-title('\fontsize{14}επιθυμητη ταχυτητα κατα τον x - αξονα (mm/sec)');
+title('desired x velocity (mm/sec)');
 xlabel('time (sec)');
 
 subplot(3,2,3);
 plot(t,pdy);
-title('\fontsize{14}επιθυμητη θεση στον y - αξονα (mm)');
+title('desired y position (mm)');
 xlabel('time (sec)');
 
 subplot(3,2,4);
 plot(t,vdy);
-title('\fontsize{14}επιθυμητη ταχυτητα κατα τον y - αξονα (mm/sec)');
+title('desired y velocity (mm/sec)');
 xlabel('time (sec)');
 
 subplot(3,2,5);
 plot(t,pdz);
-title('\fontsize{14}επιθυμητη θεση στον z - αξονα (mm)');
+title('desired z position (mm)');
 xlabel('time (sec)');
 
 subplot(3,2,6);
 plot(t,vdz);
-title('\fontsize{14}επιθυμητη ταχυτητα κατα τον z - αξονα (mm/sec)');
+title('desired z velocity (mm/sec)');
 xlabel('time (sec)');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-
-save;
 
 
 
